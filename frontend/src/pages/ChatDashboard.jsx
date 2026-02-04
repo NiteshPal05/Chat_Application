@@ -39,6 +39,7 @@ export default function ChatDashboard() {
   const localStreamRef = useRef(null);
   const messagesRef = useRef(null);
   const audioRef = useRef(null);
+  const callRoleRef = useRef(null); // "caller" | "callee"
 
   useEffect(() => {
     const updateFocus = () => {
@@ -219,7 +220,10 @@ export default function ChatDashboard() {
     const handleAnswer = async (payload) => {
       if (payload.chatId !== chatId) return;
       if (!pcRef.current) return;
+      if (callRoleRef.current !== "caller") return;
+      if (pcRef.current.signalingState !== "have-local-offer") return;
       await pcRef.current.setRemoteDescription(payload.answer);
+      await flushPendingCandidates();
       setCallActive(true);
       setIsCalling(false);
     };
@@ -228,7 +232,11 @@ export default function ChatDashboard() {
       if (payload.chatId !== chatId) return;
       const candidate = new RTCIceCandidate(payload.candidate);
       if (pcRef.current) {
-        await pcRef.current.addIceCandidate(candidate);
+        if (pcRef.current.remoteDescription) {
+          await pcRef.current.addIceCandidate(candidate);
+        } else {
+          pendingCandidatesRef.current.push(candidate);
+        }
       } else {
         pendingCandidatesRef.current.push(candidate);
       }
@@ -285,12 +293,17 @@ export default function ChatDashboard() {
     };
 
     pcRef.current = pc;
-    pendingCandidatesRef.current.forEach(async (c) => {
-      await pc.addIceCandidate(c);
-    });
-    pendingCandidatesRef.current = [];
 
     return pc;
+  };
+
+  const flushPendingCandidates = async () => {
+    if (!pcRef.current || !pcRef.current.remoteDescription) return;
+    const pending = [...pendingCandidatesRef.current];
+    pendingCandidatesRef.current = [];
+    for (const candidate of pending) {
+      await pcRef.current.addIceCandidate(candidate);
+    }
   };
 
   const getLocalStream = async (type) => {
@@ -310,6 +323,7 @@ export default function ChatDashboard() {
     if (!selectedUser || callActive || isCalling) return;
     setIsCalling(true);
     setCallType(type);
+    callRoleRef.current = "caller";
 
     const stream = await getLocalStream(type);
     const pc = createPeerConnection();
@@ -333,12 +347,14 @@ export default function ChatDashboard() {
     setIsCalling(false);
     setCallActive(true);
     setCallType(type);
+    callRoleRef.current = "callee";
 
     const stream = await getLocalStream(type);
     const pc = createPeerConnection();
     stream.getTracks().forEach((track) => pc.addTrack(track, stream));
 
     await pc.setRemoteDescription(incomingCall.offer);
+    await flushPendingCandidates();
     const answer = await pc.createAnswer();
     await pc.setLocalDescription(answer);
 
@@ -371,6 +387,7 @@ export default function ChatDashboard() {
       pcRef.current.close();
       pcRef.current = null;
     }
+    callRoleRef.current = null;
 
     if (localStreamRef.current) {
       localStreamRef.current.getTracks().forEach((t) => t.stop());
