@@ -13,7 +13,7 @@ export default function Login() {
 
     try {
       await signInWithEmailAndPassword(auth, email, password);
-      await fetch(`{BASE_URL}/api/users/last-login`, {
+      await fetch(`${BASE_URL}/api/users/last-login`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

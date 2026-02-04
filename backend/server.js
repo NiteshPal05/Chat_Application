@@ -52,6 +52,7 @@ const io = new Server(httpServer, {
       "https://chat-application-14rg.vercel.app",
     ],
     methods: ["GET", "POST"],
+    credentials: true,
   },
 });
 
