@@ -18,7 +18,16 @@ dotenv.config();
 
 
 const app = express();
-app.use(cors());
+app.use(
+  cors({
+    origin: [
+      "http://localhost:5173",
+      "https://chat-applicationn-rho.vercel.app",
+    ],
+    methods: ["GET", "POST"],
+    credentials: true,
+  })
+);
 app.use(express.json());
 
 
@@ -38,7 +47,10 @@ const httpServer = http.createServer(app)
 // Socket.io setup 
 const io = new Server(httpServer, {
   cors: {
-    origin: "http://localhost:5173",
+    origin: [
+      "http://localhost:5173",
+      "https://chat-applicationn-rho.vercel.app",
+    ],
     methods: ["GET", "POST"],
   },
 });
