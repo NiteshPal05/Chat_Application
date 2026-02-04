@@ -1,0 +1,135 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html, body, #root {
+    height: 100%;
+  }
+
+  body {
+    @apply bg-white text-gray-900;
+  }
+}
+
+/* Chat scrollbars */
+.chat-messages::-webkit-scrollbar {
+  width: 10px;
+}
+
+.chat-messages::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.chat-messages::-webkit-scrollbar-thumb {
+  background: rgba(16, 185, 129, 0.5);
+  border-radius: 999px;
+}
+
+.chat-messages {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(16, 185, 129, 0.5) transparent;
+  -webkit-overflow-scrolling: touch;
+}
+
+.chat-sidebar-list::-webkit-scrollbar {
+  width: 8px;
+}
+
+.chat-sidebar-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.chat-sidebar-list::-webkit-scrollbar-thumb {
+  background: rgba(16, 185, 129, 0.35);
+  border-radius: 999px;
+}
+
+.chat-sidebar-list {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(16, 185, 129, 0.35) transparent;
+  -webkit-overflow-scrolling: touch;
+}
+
+.chat-call-btn {
+  height: 40px;
+  width: 40px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.12);
+}
+
+.chat-back-btn {
+  display: none;
+  height: 36px;
+  width: 36px;
+  border-radius: 999px;
+  background: #e2e8f0;
+  color: #0f172a;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+}
+
+.chat-scroll-down {
+  position: absolute;
+  right: 20px;
+  bottom: 90px;
+  height: 38px;
+  width: 38px;
+  border-radius: 999px;
+  background: #16a34a;
+  color: white;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.15);
+}
+
+/* Responsive layout */
+@media (max-width: 1024px) {
+  .chat-layout {
+    flex-direction: column;
+  }
+
+  .chat-sidebar,
+  .chat-main {
+    width: 100%;
+  }
+
+  .chat-sidebar {
+    border-right: none;
+    border-bottom: 1px solid rgba(226, 232, 240, 0.6);
+  }
+
+}
+
+@media (max-width: 768px) {
+  .chat-back-btn {
+    display: inline-flex;
+  }
+
+  .chat-scroll-down {
+    right: 16px;
+    bottom: 84px;
+  }
+
+  .chat-call-btn {
+    height: 36px;
+    width: 36px;
+    font-size: 16px;
+  }
+}
+
+@media (max-width: 640px) {
+  .chat-messages {
+    padding: 12px;
+  }
+
+  .chat-sidebar-list {
+    padding-right: 4px;
+  }
+}
