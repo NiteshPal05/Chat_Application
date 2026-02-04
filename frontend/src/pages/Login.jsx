@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { signInWithEmailAndPassword } from "firebase/auth";
-import { auth } from "../Firebase/firebaseconfig";
+import { auth } from "../firebase/firebaseconfig";
 import AuthCard from "../components/AuthCard";
 
 export default function Login() {
+  const BASE_URL = import.meta.env.VITE_BACKEND_URL;
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
@@ -12,7 +13,7 @@ export default function Login() {
 
     try {
       await signInWithEmailAndPassword(auth, email, password);
-      await fetch("http://localhost:5001/api/users/last-login", {
+      await fetch(`{BASE_URL}/api/users/last-login`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

@@ -5,10 +5,12 @@ import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { io } from "socket.io-client"
 import { useEffect, useRef, useState } from "react";
 
-// connect backend socket 
-const socket = io("http://localhost:5001")
+
 
 export default function ChatDashboard() {
+  const BASE_URL = import.meta.env.VITE_BACKEND_URL;
+  // connect backend socket 
+  const socket = io(BASE_URL)
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState([]);
 
@@ -71,7 +73,7 @@ export default function ChatDashboard() {
   useEffect(() => {
     // Load old messages
     const fetchMessages = async () => {
-      const res = await fetch(`http://localhost:5001/api/messages/${chatId}`);
+      const res = await fetch(`${BASE_URL}/api/messages/${chatId}`);
       const data = await res.json();
       setMessages(data.map((m) => ({
         sender: m.sender,
@@ -128,7 +130,7 @@ export default function ChatDashboard() {
 
   useEffect(() => {
     const fetchUsers = async () => {
-      const res = await fetch("http://localhost:5001/api/users")
+      const res = await fetch(`${BASE_URL}/api/users`)
       const data = await res.json();
       setUsers(data);
     };
@@ -139,7 +141,7 @@ export default function ChatDashboard() {
 
   useEffect(() => {
     const fetchMe = async () => {
-      const res = await fetch("http://localhost:5001/api/users");
+      const res = await fetch(`${BASE_URL}/api/users`);
       const data = await res.json();
 
       const me = data.find(
@@ -155,7 +157,7 @@ export default function ChatDashboard() {
   useEffect(() => {
     const updateLastLogin = async () => {
       if (!auth.currentUser?.email) return;
-      await fetch("http://localhost:5001/api/users/last-login", {
+      await fetch(`${BASE_URL}/api/users/last-login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: auth.currentUser.email }),
@@ -171,7 +173,7 @@ export default function ChatDashboard() {
         users.map(async (u) => {
           if (u.email === currentEmail) return [u.email, null];
           const id = getChatId(currentEmail, u.email);
-          const res = await fetch(`http://localhost:5001/api/messages/${id}`);
+          const res = await fetch(`${BASE_URL}/api/messages/${id}`);
           const data = await res.json();
           const last = data[data.length - 1];
           return [u.email, last || null];
