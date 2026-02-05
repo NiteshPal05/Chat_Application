@@ -9,8 +9,7 @@ import { useEffect, useRef, useState } from "react";
 
 export default function ChatDashboard() {
   const BASE_URL = import.meta.env.VITE_BACKEND_URL;
-  // connect backend socket 
-  const socket = io(BASE_URL)
+  const socketRef = useRef(null);
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState([]);
 
@@ -31,6 +30,7 @@ export default function ChatDashboard() {
   const [unreadByEmail, setUnreadByEmail] = useState({});
   const [unreadCounts, setUnreadCounts] = useState({});
   const [isWindowFocused, setIsWindowFocused] = useState(true);
+  const [socketConnected, setSocketConnected] = useState(false);
 
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
@@ -40,6 +40,41 @@ export default function ChatDashboard() {
   const messagesRef = useRef(null);
   const audioRef = useRef(null);
   const callRoleRef = useRef(null); // "caller" | "callee"
+  const ringtoneRef = useRef(null);
+  const activeCallChatIdRef = useRef(null);
+  const usersRef = useRef([]);
+  const currentEmailRef = useRef(null);
+  const currentUsernameRef = useRef("");
+  const selectedUserEmailRef = useRef(null);
+  const chatIdRef = useRef(null);
+
+  useEffect(() => {
+    if (!BASE_URL) return;
+    if (!socketRef.current) {
+      socketRef.current = io(BASE_URL, {
+        transports: ["websocket", "polling"],
+      });
+    }
+    return () => {};
+  }, [BASE_URL]);
+
+  useEffect(() => {
+    const socket = socketRef.current;
+    if (!socket) return;
+
+    const handleConnect = () => setSocketConnected(true);
+    const handleDisconnect = () => setSocketConnected(false);
+
+    socket.on("connect", handleConnect);
+    socket.on("disconnect", handleDisconnect);
+
+    setSocketConnected(socket.connected);
+
+    return () => {
+      socket.off("connect", handleConnect);
+      socket.off("disconnect", handleDisconnect);
+    };
+  }, [BASE_URL]);
 
   useEffect(() => {
     const updateFocus = () => {
@@ -69,6 +104,9 @@ export default function ChatDashboard() {
     ? getChatId(auth.currentUser.email, selectedUser.email)
     : "global";
   const currentEmail = auth.currentUser?.email;
+  chatIdRef.current = chatId;
+  currentEmailRef.current = currentEmail;
+  selectedUserEmailRef.current = selectedUser?.email || null;
 
   // receive messages 
   useEffect(() => {
@@ -89,35 +127,46 @@ export default function ChatDashboard() {
 
     fetchMessages();
 
+    const socket = socketRef.current;
+    if (!socket) return;
+
     socket.on("receiveMessage", (msg) => {
-      if (msg.chatId === chatId) {
+      if (msg.chatId === chatIdRef.current) {
         setMessages((prev) => [...prev, msg]);
-        if (selectedUser?.email) {
+        if (selectedUserEmailRef.current) {
           setLastMessages((prev) => ({
             ...prev,
-            [selectedUser.email]: msg,
+            [selectedUserEmailRef.current]: msg,
           }));
         }
       } else {
         // New message for another chat
-        if (msg.sender !== currentUsername) {
+        if (msg.sender !== currentUsernameRef.current) {
           playNotificationSound();
         }
         if (msg.chatId) {
           setLastMessages((prev) => {
             const updated = { ...prev };
-            const otherUser = users.find((u) =>
-              msg.chatId.includes(u.email) && u.email !== currentEmail
-            );
-            if (otherUser) {
-              updated[otherUser.email] = msg;
+            let otherEmail = null;
+            if (currentEmailRef.current && msg.chatId.includes("_")) {
+              const parts = msg.chatId.split("_");
+              otherEmail = parts.find((p) => p !== currentEmailRef.current) || null;
+            }
+            if (!otherEmail) {
+              const otherUser = usersRef.current.find(
+                (u) => msg.chatId.includes(u.email) && u.email !== currentEmailRef.current
+              );
+              otherEmail = otherUser?.email || null;
+            }
+            if (otherEmail) {
+              updated[otherEmail] = msg;
               setUnreadByEmail((prevUnread) => ({
                 ...prevUnread,
-                [otherUser.email]: true,
+                [otherEmail]: true,
               }));
               setUnreadCounts((prevCounts) => ({
                 ...prevCounts,
-                [otherUser.email]: (prevCounts[otherUser.email] || 0) + 1,
+                [otherEmail]: (prevCounts[otherEmail] || 0) + 1,
               }));
             }
             return updated;
@@ -127,7 +176,7 @@ export default function ChatDashboard() {
     });
 
     return () => socket.off("receiveMessage");
-  }, [chatId])
+  }, [chatId, BASE_URL])
 
   useEffect(() => {
     const fetchUsers = async () => {
@@ -138,6 +187,9 @@ export default function ChatDashboard() {
 
     fetchUsers();
   }, []);
+  useEffect(() => {
+    usersRef.current = users;
+  }, [users]);
 
 
   useEffect(() => {
@@ -154,6 +206,9 @@ export default function ChatDashboard() {
 
     fetchMe();
   }, []);
+  useEffect(() => {
+    currentUsernameRef.current = currentUsername;
+  }, [currentUsername]);
 
   useEffect(() => {
     const updateLastLogin = async () => {
@@ -193,32 +248,40 @@ export default function ChatDashboard() {
 
   useEffect(() => {
     if (currentUsername) {
-      socket.emit("userOnline", currentUsername);
+      socketRef.current?.emit("userOnline", currentUsername);
     }
   }, [currentUsername]);
 
   useEffect(() => {
+    const socket = socketRef.current;
+    if (!socket) return;
+
     socket.on("onlineUsers", (users) => {
       setOnlineUsers(users);
     });
 
     return () => socket.off("onlineUsers");
-  }, []);
+  }, [BASE_URL]);
 
   useEffect(() => {
     if (chatId !== "global") {
-      socket.emit("joinRoom", chatId);
+      socketRef.current?.emit("joinRoom", chatId);
     }
   }, [chatId]);
 
   useEffect(() => {
+    const socket = socketRef.current;
+    if (!socket) return;
+
     const handleOffer = (payload) => {
-      if (payload.chatId !== chatId) return;
+      if (!payload?.chatId) return;
+      // If already in a call, ignore
+      if (activeCallChatIdRef.current) return;
       setIncomingCall(payload);
     };
 
     const handleAnswer = async (payload) => {
-      if (payload.chatId !== chatId) return;
+      if (payload.chatId !== activeCallChatIdRef.current) return;
       if (!pcRef.current) return;
       if (callRoleRef.current !== "caller") return;
       if (pcRef.current.signalingState !== "have-local-offer") return;
@@ -229,7 +292,7 @@ export default function ChatDashboard() {
     };
 
     const handleCandidate = async (payload) => {
-      if (payload.chatId !== chatId) return;
+      if (payload.chatId !== activeCallChatIdRef.current) return;
       const candidate = new RTCIceCandidate(payload.candidate);
       if (pcRef.current) {
         if (pcRef.current.remoteDescription) {
@@ -243,12 +306,12 @@ export default function ChatDashboard() {
     };
 
     const handleReject = (payload) => {
-      if (payload.chatId !== chatId) return;
+      if (payload.chatId !== activeCallChatIdRef.current) return;
       cleanupCall();
     };
 
     const handleEnd = (payload) => {
-      if (payload.chatId !== chatId) return;
+      if (payload.chatId !== activeCallChatIdRef.current) return;
       cleanupCall();
     };
 
@@ -265,7 +328,7 @@ export default function ChatDashboard() {
       socket.off("callReject", handleReject);
       socket.off("callEnd", handleEnd);
     };
-  }, [chatId]);
+  }, [chatId, BASE_URL]);
 
   useEffect(() => {
     return () => cleanupCall();
@@ -286,7 +349,7 @@ export default function ChatDashboard() {
 
     pc.onicecandidate = (event) => {
       if (!event.candidate) return;
-      socket.emit("iceCandidate", {
+      socketRef.current?.emit("iceCandidate", {
         chatId,
         candidate: event.candidate,
       });
@@ -324,6 +387,7 @@ export default function ChatDashboard() {
     setIsCalling(true);
     setCallType(type);
     callRoleRef.current = "caller";
+    activeCallChatIdRef.current = chatId;
 
     const stream = await getLocalStream(type);
     const pc = createPeerConnection();
@@ -332,7 +396,7 @@ export default function ChatDashboard() {
     const offer = await pc.createOffer();
     await pc.setLocalDescription(offer);
 
-    socket.emit("callOffer", {
+    socketRef.current?.emit("callOffer", {
       chatId,
       from: currentUsername,
       callType: type,
@@ -348,6 +412,14 @@ export default function ChatDashboard() {
     setCallActive(true);
     setCallType(type);
     callRoleRef.current = "callee";
+    activeCallChatIdRef.current = incomingCall.chatId;
+    if (incomingCall.chatId && currentEmailRef.current) {
+      const parts = incomingCall.chatId.split("_");
+      const otherEmail = parts.find((p) => p !== currentEmailRef.current);
+      const otherUser = usersRef.current.find((u) => u.email === otherEmail);
+      if (otherUser) setSelectedUser(otherUser);
+    }
+    socketRef.current?.emit("joinRoom", incomingCall.chatId);
 
     const stream = await getLocalStream(type);
     const pc = createPeerConnection();
@@ -358,20 +430,20 @@ export default function ChatDashboard() {
     const answer = await pc.createAnswer();
     await pc.setLocalDescription(answer);
 
-    socket.emit("callAnswer", {
-      chatId,
+    socketRef.current?.emit("callAnswer", {
+      chatId: incomingCall.chatId,
       answer,
     });
   };
 
   const rejectCall = () => {
     if (!incomingCall) return;
-    socket.emit("callReject", { chatId });
+    socketRef.current?.emit("callReject", { chatId: incomingCall.chatId });
     setIncomingCall(null);
   };
 
   const endCall = () => {
-    socket.emit("callEnd", { chatId });
+    socketRef.current?.emit("callEnd", { chatId: activeCallChatIdRef.current });
     cleanupCall();
   };
 
@@ -388,6 +460,7 @@ export default function ChatDashboard() {
       pcRef.current = null;
     }
     callRoleRef.current = null;
+    activeCallChatIdRef.current = null;
 
     if (localStreamRef.current) {
       localStreamRef.current.getTracks().forEach((t) => t.stop());
@@ -396,6 +469,7 @@ export default function ChatDashboard() {
 
     if (localVideoRef.current) localVideoRef.current.srcObject = null;
     if (remoteVideoRef.current) remoteVideoRef.current.srcObject = null;
+    stopRingtone();
   };
 
 
@@ -434,7 +508,7 @@ export default function ChatDashboard() {
       fileName: file ? file.name : null,
     };
 
-    socket.emit("sendMessage", msgData);
+    socketRef.current?.emit("sendMessage", msgData);
     if (selectedUser?.email) {
       setLastMessages((prev) => ({
         ...prev,
@@ -483,6 +557,8 @@ export default function ChatDashboard() {
     try {
       if (!audioRef.current) {
         audioRef.current = new Audio("/sound.mp3");
+        audioRef.current.preload = "auto";
+        audioRef.current.volume = 1;
       }
       audioRef.current.currentTime = 0;
       audioRef.current.play().catch(() => {});
@@ -490,6 +566,62 @@ export default function ChatDashboard() {
       // ignore audio errors
     }
   };
+
+  const playRingtone = () => {
+    try {
+      if (!ringtoneRef.current) {
+        ringtoneRef.current = new Audio("/ringtone.mp3");
+        ringtoneRef.current.preload = "auto";
+        ringtoneRef.current.loop = true;
+        ringtoneRef.current.volume = 1;
+      }
+      ringtoneRef.current.currentTime = 0;
+      ringtoneRef.current.play().catch(() => {});
+    } catch {
+      // ignore audio errors
+    }
+  };
+
+  const stopRingtone = () => {
+    if (!ringtoneRef.current) return;
+    ringtoneRef.current.pause();
+    ringtoneRef.current.currentTime = 0;
+  };
+
+  useEffect(() => {
+    const unlockAudio = () => {
+      if (!audioRef.current) {
+        audioRef.current = new Audio("/sound.mp3");
+        audioRef.current.preload = "auto";
+        audioRef.current.volume = 1;
+      }
+      if (!ringtoneRef.current) {
+        ringtoneRef.current = new Audio("/ringtone.mp3");
+        ringtoneRef.current.preload = "auto";
+        ringtoneRef.current.loop = true;
+        ringtoneRef.current.volume = 1;
+      }
+      audioRef.current.play().then(() => {
+        audioRef.current.pause();
+        audioRef.current.currentTime = 0;
+      }).catch(() => {});
+      ringtoneRef.current.play().then(() => {
+        ringtoneRef.current.pause();
+        ringtoneRef.current.currentTime = 0;
+      }).catch(() => {});
+      window.removeEventListener("click", unlockAudio);
+    };
+    window.addEventListener("click", unlockAudio);
+    return () => window.removeEventListener("click", unlockAudio);
+  }, []);
+
+  useEffect(() => {
+    if (incomingCall) {
+      playRingtone();
+    } else {
+      stopRingtone();
+    }
+  }, [incomingCall]);
 
   const scrollToBottom = () => {
     if (!messagesRef.current) return;
@@ -532,6 +664,16 @@ export default function ChatDashboard() {
         >
           Chat Application
         </h2>
+        <div className="mt-2 flex items-center gap-2 text-xs">
+          <span
+            className={`h-2 w-2 rounded-full ${
+              socketConnected ? "bg-emerald-500" : "bg-red-500"
+            }`}
+          ></span>
+          <span className="text-gray-600">
+            {socketConnected ? "Connected" : "Disconnected"}
+          </span>
+        </div>
 
 
         <p className="mt-2 text-sm text-gray-600">
@@ -836,6 +978,12 @@ export default function ChatDashboard() {
                 placeholder="Type a message..."
                 className="flex-1 border rounded-xl px-4 py-2 bg-white"
                 onChange={(e) => setMessage(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    sendMessage();
+                  }
+                }}
               />
 
               <button
@@ -854,7 +1002,7 @@ export default function ChatDashboard() {
         )}
 
       </div>
-      {(incomingCall || callActive || isCalling) && selectedUser && (
+      {(incomingCall || callActive || isCalling) && (
         <div className="fixed inset-0 bg-black bg-opacity-60 flex justify-center items-center z-50">
           <div className="bg-white rounded-2xl p-4 w-[90%] max-w-3xl border border-white/60">
             {incomingCall && (
