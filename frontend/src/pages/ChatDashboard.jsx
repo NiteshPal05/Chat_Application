@@ -305,8 +305,10 @@ export default function ChatDashboard() {
 
     const handleOffer = (payload) => {
       if (!payload?.chatId) return;
-      // If already in a call, ignore
-      if (activeCallChatIdRef.current) return;
+      if (callActive || isCalling || incomingCall || activeCallChatIdRef.current) {
+        socketRef.current?.emit("callReject", { chatId: payload.chatId, reason: "busy" });
+        return;
+      }
       setIncomingCall(payload);
     };
 
@@ -403,10 +405,19 @@ export default function ChatDashboard() {
 
     pc.oniceconnectionstatechange = () => {
       console.log("[WebRTC] iceConnectionState:", pc.iceConnectionState);
+      if (pc.iceConnectionState === "failed") {
+        cleanupCall();
+      }
     };
 
     pc.onconnectionstatechange = () => {
       console.log("[WebRTC] connectionState:", pc.connectionState);
+      if (pc.connectionState === "connected") {
+        setCallActive(true);
+      }
+      if (pc.connectionState === "failed") {
+        cleanupCall();
+      }
     };
 
     pc.onsignalingstatechange = () => {
