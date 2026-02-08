@@ -270,6 +270,17 @@ export default function ChatDashboard() {
   }, [chatId]);
 
   useEffect(() => {
+    if (!currentEmail || users.length === 0) return;
+    const socket = socketRef.current;
+    if (!socket) return;
+    users.forEach((u) => {
+      if (u.email === currentEmail) return;
+      const id = getChatId(currentEmail, u.email);
+      socket.emit("joinRoom", id);
+    });
+  }, [users, currentEmail]);
+
+  useEffect(() => {
     const socket = socketRef.current;
     if (!socket) return;
 
@@ -616,12 +627,15 @@ export default function ChatDashboard() {
   }, []);
 
   useEffect(() => {
-    if (incomingCall) {
+    const shouldRing =
+      incomingCall && incomingCall.chatId === chatIdRef.current;
+
+    if (shouldRing) {
       playRingtone();
     } else {
       stopRingtone();
     }
-  }, [incomingCall]);
+  }, [incomingCall, chatId]);
 
   const scrollToBottom = () => {
     if (!messagesRef.current) return;
@@ -777,7 +791,7 @@ export default function ChatDashboard() {
           <>
             {/* Header */}
             <div className="p-4 border-b border-white/60 bg-white/80 backdrop-blur font-semibold sticky top-0 z-10">
-              <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center justify-between gap-4 flex-wrap">
                 <div className="flex items-center gap-3">
                   <button
                     onClick={() => setSelectedUser(null)}
@@ -1059,7 +1073,7 @@ export default function ChatDashboard() {
               </div>
               <div className="bg-gray-100 rounded-xl p-2">
                 <p className="text-sm font-semibold mb-2 text-gray-800">
-                  {selectedUser.username}
+                  {selectedUser?.username || "User"}
                 </p>
                 <video
                   ref={remoteVideoRef}
