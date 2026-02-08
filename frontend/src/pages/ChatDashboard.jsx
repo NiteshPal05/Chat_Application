@@ -342,6 +342,7 @@ export default function ChatDashboard() {
       if (callRoleRef.current !== "caller") return;
       if (pcRef.current.signalingState !== "have-local-offer") return;
       await pcRef.current.setRemoteDescription(payload.answer);
+      logSdpSummary("remoteAnswer", pcRef.current.remoteDescription);
       await flushPendingCandidates();
       setCallActive(true);
       setIsCalling(false);
@@ -431,13 +432,6 @@ export default function ChatDashboard() {
       iceTransportPolicy: "relay",
     });
 
-    if (type === "video") {
-      pc.addTransceiver("audio", { direction: "sendrecv" });
-      pc.addTransceiver("video", { direction: "sendrecv" });
-    } else if (type === "audio") {
-      pc.addTransceiver("audio", { direction: "sendrecv" });
-    }
-
     pc.oniceconnectionstatechange = () => {
       console.log("[WebRTC] iceConnectionState:", pc.iceConnectionState);
       if (pc.iceConnectionState === "failed") {
@@ -475,33 +469,51 @@ export default function ChatDashboard() {
         readyState: event.track.readyState,
         enabled: event.track.enabled,
       });
-      const stream = remoteStreamRef.current;
-      // Keep at most one track of each kind in the remote stream.
-      if (event.track.kind === "video") {
-        stream.getVideoTracks().forEach((t) => stream.removeTrack(t));
+      const streamFromEvent = event.streams?.[0] || null;
+      let stream = streamFromEvent;
+
+      if (streamFromEvent) {
+        remoteStreamRef.current = streamFromEvent;
+      } else {
+        stream = remoteStreamRef.current;
+        // Keep at most one track of each kind in the remote stream.
+        if (event.track.kind === "video") {
+          stream.getVideoTracks().forEach((t) => stream.removeTrack(t));
+        }
+        if (event.track.kind === "audio") {
+          stream.getAudioTracks().forEach((t) => stream.removeTrack(t));
+        }
+        const exists = stream.getTracks().some((t) => t.id === event.track.id);
+        if (!exists) stream.addTrack(event.track);
       }
-      if (event.track.kind === "audio") {
-        stream.getAudioTracks().forEach((t) => stream.removeTrack(t));
-      }
-      const exists = stream.getTracks().some((t) => t.id === event.track.id);
-      if (!exists) {
-        stream.addTrack(event.track);
-      }
-      if (remoteVideoRef.current) {
-        remoteVideoRef.current.srcObject = stream;
-        // Keep video muted so autoplay isn't blocked; play audio via <audio>.
-        remoteVideoRef.current.muted = true;
-        remoteVideoRef.current.play?.().catch((err) => {
-          console.log("[WebRTC] remoteVideo play blocked:", err?.name || err);
-        });
-      }
-      if (remoteAudioRef.current) {
-        remoteAudioRef.current.srcObject = stream;
-        remoteAudioRef.current.muted = false;
-        remoteAudioRef.current.play?.().catch((err) => {
-          console.log("[WebRTC] remoteAudio play blocked:", err?.name || err);
-        });
-      }
+
+      const tryPlayRemoteMedia = () => {
+        if (remoteVideoRef.current) {
+          remoteVideoRef.current.srcObject = stream;
+          // Keep video muted so autoplay isn't blocked; play audio via <audio>.
+          remoteVideoRef.current.muted = true;
+          remoteVideoRef.current.play?.().catch((err) => {
+            console.log("[WebRTC] remoteVideo play blocked:", err?.name || err);
+          });
+        }
+        if (remoteAudioRef.current) {
+          remoteAudioRef.current.srcObject = stream;
+          remoteAudioRef.current.muted = false;
+          remoteAudioRef.current.play?.().catch((err) => {
+            console.log("[WebRTC] remoteAudio play blocked:", err?.name || err);
+          });
+        }
+      };
+
+      // Attach immediately, then retry once tracks actually start producing frames.
+      tryPlayRemoteMedia();
+      event.track.onunmute = () => {
+        console.log("[WebRTC] track unmuted:", event.track.kind);
+        tryPlayRemoteMedia();
+      };
+      event.track.onmute = () => {
+        console.log("[WebRTC] track muted:", event.track.kind);
+      };
     };
 
     pc.onicecandidate = (event) => {
@@ -522,31 +534,82 @@ export default function ChatDashboard() {
     return pc;
   };
 
+  const logSdpSummary = (label, desc) => {
+    const sdp = desc?.sdp;
+    if (!sdp) return;
+    const lines = sdp.split(/\r?\n/);
+    const items = [];
+    let current = null;
+
+    for (const line of lines) {
+      if (line.startsWith("m=")) {
+        const kind = line.split(" ")[0]?.slice(2);
+        current = { kind, mid: null, direction: null };
+        items.push(current);
+        continue;
+      }
+      if (!current) continue;
+      if (line.startsWith("a=mid:")) current.mid = line.slice("a=mid:".length);
+      if (
+        line === "a=sendrecv" ||
+        line === "a=sendonly" ||
+        line === "a=recvonly" ||
+        line === "a=inactive"
+      ) {
+        current.direction = line.slice(2);
+      }
+    }
+
+    console.log(`[WebRTC] ${label} SDP:`, items);
+  };
+
   const attachLocalTracks = async (pc, stream, type) => {
+    // Keep SDP m-line order stable: audio first, then video.
     const audioTrack = stream.getAudioTracks?.()[0] || null;
-    const videoTrack = type === "video" ? (stream.getVideoTracks?.()[0] || null) : null;
+    const videoTrack =
+      type === "video" ? stream.getVideoTracks?.()[0] || null : null;
+
+    console.log("[WebRTC] local tracks:", {
+      audio: !!audioTrack,
+      video: !!videoTrack,
+    });
 
     const transceivers = pc.getTransceivers?.() || [];
-    const audioTransceiver = transceivers.find((t) => t.receiver?.track?.kind === "audio");
-    const videoTransceiver = transceivers.find((t) => t.receiver?.track?.kind === "video");
+    const byKind = (kind) =>
+      transceivers.find((t) => t?.receiver?.track?.kind === kind);
 
-    if (audioTrack) {
-      if (audioTransceiver?.sender?.replaceTrack) {
-        audioTransceiver.direction = "sendrecv";
-        await audioTransceiver.sender.replaceTrack(audioTrack);
-      } else {
-        pc.addTrack(audioTrack, stream);
+    const replaceOrAdd = async (kind, track) => {
+      if (!track) return;
+      const transceiver = byKind(kind);
+      if (transceiver?.sender) {
+        try {
+          transceiver.direction = "sendrecv";
+          await transceiver.sender.replaceTrack(track);
+          console.log(`[WebRTC] replaceTrack ok (${kind})`);
+          return;
+        } catch (err) {
+          console.log(
+            `[WebRTC] replaceTrack failed (${kind}):`,
+            err?.name || err
+          );
+        }
       }
-    }
+      pc.addTrack(track, stream);
+      console.log(`[WebRTC] addTrack ok (${kind})`);
+    };
 
-    if (videoTrack) {
-      if (videoTransceiver?.sender?.replaceTrack) {
-        videoTransceiver.direction = "sendrecv";
-        await videoTransceiver.sender.replaceTrack(videoTrack);
-      } else {
-        pc.addTrack(videoTrack, stream);
-      }
-    }
+    await replaceOrAdd("audio", audioTrack);
+    await replaceOrAdd("video", videoTrack);
+
+    console.log(
+      "[WebRTC] senders:",
+      pc.getSenders().map((s) => ({
+        kind: s.track?.kind,
+        id: s.track?.id,
+        enabled: s.track?.enabled,
+        readyState: s.track?.readyState,
+      }))
+    );
   };
 
   const flushPendingCandidates = async () => {
@@ -606,6 +669,7 @@ export default function ChatDashboard() {
 
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
+      logSdpSummary("localOffer", pc.localDescription);
 
       socketRef.current?.emit("callOffer", {
         chatId,
@@ -651,10 +715,12 @@ export default function ChatDashboard() {
     }
     const pc = await createPeerConnection(type);
     await pc.setRemoteDescription(incomingCall.offer);
+    logSdpSummary("remoteOffer", pc.remoteDescription);
     await attachLocalTracks(pc, stream, type);
     await flushPendingCandidates();
     const answer = await pc.createAnswer();
     await pc.setLocalDescription(answer);
+    logSdpSummary("localAnswer", pc.localDescription);
 
     socketRef.current?.emit("callAnswer", {
       chatId: incomingCall.chatId,
@@ -1082,7 +1148,7 @@ export default function ChatDashboard() {
               {messages.map((msg, index) => (
                 <div
                   key={index}
-                  className={`p-3 rounded-xl w-fit ${msg.sender === currentUsername
+                  className={`p-3 rounded-xl max-w-[85%] ${msg.sender === currentUsername
                     ? "ml-auto bg-green-300 text-black"
                     : "bg-white shadow text-gray-800"
                     }`}
@@ -1090,7 +1156,7 @@ export default function ChatDashboard() {
                   <p className="text-sm font-bold">
                     {msg.sender === currentUsername ? "You" : msg.sender}
                   </p>
-                  <p className="break-all whitespace-pre-wrap">{msg.text}</p>
+                  <p className="break-words whitespace-pre-wrap">{msg.text}</p>
                   <p className="text-[11px] text-gray-500 mt-1">
                     {formatTimestamp(msg.createdAt)}
                   </p>
