@@ -364,7 +364,11 @@ export default function ChatDashboard() {
     return () => cleanupCall();
   }, []);
 
-  const createPeerConnection = () => {
+  const createPeerConnection = (type) => {
+    if (pcRef.current) {
+      pcRef.current.close();
+      pcRef.current = null;
+    }
     const normalizedIceServers = (iceServers || []).map((s) => ({
       urls: s.urls || s.url,
       username: s.username,
@@ -375,6 +379,13 @@ export default function ChatDashboard() {
       iceServers: normalizedIceServers,
       iceTransportPolicy: "relay",
     });
+
+    if (type === "video") {
+      pc.addTransceiver("audio");
+      pc.addTransceiver("video");
+    } else if (type === "audio") {
+      pc.addTransceiver("audio");
+    }
 
     pc.oniceconnectionstatechange = () => {
       console.log("[WebRTC] iceConnectionState:", pc.iceConnectionState);
@@ -439,24 +450,34 @@ export default function ChatDashboard() {
 
   const startCall = async (type) => {
     if (!selectedUser || callActive || isCalling) return;
-    setIsCalling(true);
-    setCallType(type);
-    callRoleRef.current = "caller";
-    activeCallChatIdRef.current = chatId;
+    try {
+      setIsCalling(true);
+      setCallType(type);
+      callRoleRef.current = "caller";
+      activeCallChatIdRef.current = chatId;
 
-    const stream = await getLocalStream(type);
-    const pc = createPeerConnection();
-    stream.getTracks().forEach((track) => pc.addTrack(track, stream));
+      const stream = await getLocalStream(type);
+      if (type === "video") {
+        const hasVideo = stream.getVideoTracks().length > 0;
+        if (!hasVideo) {
+          throw new Error("Video permission denied");
+        }
+      }
+      const pc = createPeerConnection(type);
+      stream.getTracks().forEach((track) => pc.addTrack(track, stream));
 
-    const offer = await pc.createOffer();
-    await pc.setLocalDescription(offer);
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
 
-    socketRef.current?.emit("callOffer", {
-      chatId,
-      from: currentUsername,
-      callType: type,
-      offer,
-    });
+      socketRef.current?.emit("callOffer", {
+        chatId,
+        from: currentUsername,
+        callType: type,
+        offer,
+      });
+    } catch {
+      cleanupCall();
+    }
   };
 
   const acceptCall = async () => {
@@ -477,7 +498,15 @@ export default function ChatDashboard() {
     socketRef.current?.emit("joinRoom", incomingCall.chatId);
 
     const stream = await getLocalStream(type);
-    const pc = createPeerConnection();
+    if (type === "video") {
+      const hasVideo = stream.getVideoTracks().length > 0;
+      if (!hasVideo) {
+        socketRef.current?.emit("callReject", { chatId: incomingCall.chatId });
+        setIncomingCall(null);
+        return;
+      }
+    }
+    const pc = createPeerConnection(type);
     stream.getTracks().forEach((track) => pc.addTrack(track, stream));
 
     await pc.setRemoteDescription(incomingCall.offer);
