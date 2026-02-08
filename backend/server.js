@@ -102,6 +102,7 @@ io.on("connection", (socket) => {
       fileUrl: msgData.fileUrl || null,
       fileType: msgData.fileType || null,
       fileName: msgData.fileName,
+      status: "sent",
 
     });
     io.to(msgData.chatId).emit("receiveMessage", newMessage);
@@ -135,6 +136,45 @@ io.on("connection", (socket) => {
   socket.on("callEnd", (payload) => {
     if (!payload?.chatId) return;
     socket.to(payload.chatId).emit("callEnd", payload);
+  });
+
+  socket.on("messageDelivered", async (payload) => {
+    const messageIds = payload?.messageIds || [];
+    if (!payload?.chatId || !Array.isArray(messageIds) || messageIds.length === 0) return;
+    try {
+      const now = new Date();
+      await Message.updateMany(
+        { _id: { $in: messageIds }, chatId: payload.chatId, status: "sent" },
+        { $set: { status: "delivered", deliveredAt: now } }
+      );
+      io.to(payload.chatId).emit("messageStatus", {
+        messageIds,
+        status: "delivered",
+        deliveredAt: now,
+      });
+    } catch (error) {
+      console.log("Message delivered update error:", error.message);
+    }
+  });
+
+  socket.on("messageSeen", async (payload) => {
+    const messageIds = payload?.messageIds || [];
+    if (!payload?.chatId || !Array.isArray(messageIds) || messageIds.length === 0) return;
+    try {
+      const now = new Date();
+      await Message.updateMany(
+        { _id: { $in: messageIds }, chatId: payload.chatId, status: { $in: ["sent", "delivered"] } },
+        { $set: { status: "seen", deliveredAt: now, seenAt: now } }
+      );
+      io.to(payload.chatId).emit("messageStatus", {
+        messageIds,
+        status: "seen",
+        deliveredAt: now,
+        seenAt: now,
+      });
+    } catch (error) {
+      console.log("Message seen update error:", error.message);
+    }
   });
 
   // Join Room for Private Chat 
