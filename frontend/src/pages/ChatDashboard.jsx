@@ -906,7 +906,7 @@ export default function ChatDashboard() {
                   <p className="text-sm font-bold">
                     {msg.sender === currentUsername ? "You" : msg.sender}
                   </p>
-                  <p className="break-words">{msg.text}</p>
+                  <p className="break-all whitespace-pre-wrap">{msg.text}</p>
                   <p className="text-[11px] text-gray-500 mt-1">
                     {formatTimestamp(msg.createdAt)}
                   </p>
