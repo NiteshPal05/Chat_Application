@@ -447,8 +447,15 @@ export default function ChatDashboard() {
         readyState: event.track.readyState,
         enabled: event.track.enabled,
       });
-      const stream = event.streams[0] || new MediaStream();
-      if (event.track.kind === "video" && stream.getVideoTracks().length === 0) {
+      event.track.onmute = () => {
+        console.log("[WebRTC] track muted:", event.track.kind);
+      };
+      event.track.onunmute = () => {
+        console.log("[WebRTC] track unmuted:", event.track.kind);
+      };
+      const stream = remoteStreamRef.current;
+      const exists = stream.getTracks().some((t) => t.id === event.track.id);
+      if (!exists) {
         stream.addTrack(event.track);
       }
       if (remoteVideoRef.current) {
@@ -513,6 +520,9 @@ export default function ChatDashboard() {
       activeCallIdRef.current = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
       const stream = await getLocalStream(type);
+      stream.getVideoTracks().forEach((t) => {
+        t.enabled = true;
+      });
       if (type === "video") {
         const hasVideo = stream.getVideoTracks().length > 0;
         if (!hasVideo) {
@@ -556,6 +566,9 @@ export default function ChatDashboard() {
     socketRef.current?.emit("joinRoom", incomingCall.chatId);
 
     const stream = await getLocalStream(type);
+    stream.getVideoTracks().forEach((t) => {
+      t.enabled = true;
+    });
     if (type === "video") {
       const hasVideo = stream.getVideoTracks().length > 0;
       if (!hasVideo) {
