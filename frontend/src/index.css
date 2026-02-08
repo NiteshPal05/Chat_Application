@@ -30,6 +30,7 @@
   scrollbar-width: thin;
   scrollbar-color: rgba(16, 185, 129, 0.5) transparent;
   -webkit-overflow-scrolling: touch;
+  overflow-x: hidden;
 }
 
 .chat-sidebar-list::-webkit-scrollbar {

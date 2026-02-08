@@ -383,12 +383,12 @@ export default function ChatDashboard() {
 
     pc.ontrack = (event) => {
       console.log("[WebRTC] ontrack streams:", event.streams);
+      const stream = event.streams[0] || new MediaStream([event.track]);
       if (remoteVideoRef.current) {
-        remoteVideoRef.current.srcObject = event.streams[0];
-        const playPromise = remoteVideoRef.current.play?.();
-        if (playPromise?.catch) {
-          playPromise.catch(() => {});
-        }
+        remoteVideoRef.current.srcObject = stream;
+        event.track.onunmute = () => {
+          remoteVideoRef.current.play?.().catch(() => {});
+        };
       }
     };
 
@@ -906,7 +906,7 @@ export default function ChatDashboard() {
                   <p className="text-sm font-bold">
                     {msg.sender === currentUsername ? "You" : msg.sender}
                   </p>
-                  <p>{msg.text}</p>
+                  <p className="break-words">{msg.text}</p>
                   <p className="text-[11px] text-gray-500 mt-1">
                     {formatTimestamp(msg.createdAt)}
                   </p>
