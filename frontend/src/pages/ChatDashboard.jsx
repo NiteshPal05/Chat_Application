@@ -365,8 +365,15 @@ export default function ChatDashboard() {
   }, []);
 
   const createPeerConnection = () => {
+    const normalizedIceServers = (iceServers || []).map((s) => ({
+      urls: s.urls || s.url,
+      username: s.username,
+      credential: s.credential,
+    }));
+    console.log("[WebRTC] Using iceServers:", normalizedIceServers);
     const pc = new RTCPeerConnection({
-      iceServers,
+      iceServers: normalizedIceServers,
+      iceTransportPolicy: "relay",
     });
 
     pc.oniceconnectionstatechange = () => {
@@ -395,8 +402,10 @@ export default function ChatDashboard() {
     pc.onicecandidate = (event) => {
       if (!event.candidate) return;
       console.log("[WebRTC] ICE candidate:", event.candidate.candidate);
+      const activeChatId = activeCallChatIdRef.current || chatId;
+      if (!activeChatId) return;
       socketRef.current?.emit("iceCandidate", {
-        chatId,
+        chatId: activeChatId,
         candidate: event.candidate,
       });
     };
