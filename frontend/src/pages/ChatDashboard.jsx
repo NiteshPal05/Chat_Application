@@ -352,7 +352,20 @@ export default function ChatDashboard() {
       ],
     });
 
+    pc.oniceconnectionstatechange = () => {
+      console.log("[WebRTC] iceConnectionState:", pc.iceConnectionState);
+    };
+
+    pc.onconnectionstatechange = () => {
+      console.log("[WebRTC] connectionState:", pc.connectionState);
+    };
+
+    pc.onsignalingstatechange = () => {
+      console.log("[WebRTC] signalingState:", pc.signalingState);
+    };
+
     pc.ontrack = (event) => {
+      console.log("[WebRTC] ontrack streams:", event.streams);
       if (remoteVideoRef.current) {
         remoteVideoRef.current.srcObject = event.streams[0];
         const playPromise = remoteVideoRef.current.play?.();
@@ -364,6 +377,7 @@ export default function ChatDashboard() {
 
     pc.onicecandidate = (event) => {
       if (!event.candidate) return;
+      console.log("[WebRTC] ICE candidate:", event.candidate.candidate);
       socketRef.current?.emit("iceCandidate", {
         chatId,
         candidate: event.candidate,
