@@ -66,6 +66,7 @@ frontend/public/ringtone.mp3
 ## Deployment
 - Frontend (Vercel): set `VITE_BACKEND_URL` to your backend URL
 - Backend (Render): set all env vars (`MONGO_URI`, `TWILIO_*`)
+- database(mongodb atlas)
 
 ## Status Ticks
 - ✓ Sent
