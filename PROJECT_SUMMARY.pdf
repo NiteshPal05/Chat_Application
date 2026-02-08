@@ -1,0 +1,131 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>
+endobj
+4 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+5 0 obj
+<< /Length 2620 >>
+stream
+BT
+/F1 11 Tf
+54 738 Td
+(CHATAPPLICATION PROJECT SUMMARY) Tj
+0 -14 Td
+() Tj
+0 -14 Td
+(OVERVIEW) Tj
+0 -14 Td
+(* Real-time 1-to-1 chat application with WhatsApp-like UX.) Tj
+0 -14 Td
+(* Supports text, media, audio calls, and video calls.) Tj
+0 -14 Td
+(* WebRTC for peer-to-peer calls with TURN for NAT traversal.) Tj
+0 -14 Td
+(* Socket.io used for real-time messaging and signaling.) Tj
+0 -14 Td
+(* Firebase Storage used for file uploads.) Tj
+0 -14 Td
+(* Deployed with frontend on Vercel and backend on Render.) Tj
+0 -14 Td
+() Tj
+0 -14 Td
+(CORE FEATURES) Tj
+0 -14 Td
+(* User authentication with Firebase.) Tj
+0 -14 Td
+(* One-to-one chat with typing and file attachments.) Tj
+0 -14 Td
+(* Image preview \(modal\) and document link preview.) Tj
+0 -14 Td
+(* Real-time unread badges and sidebar message previews.) Tj
+0 -14 Td
+(* Online status indicator for users \(green dot\).) Tj
+0 -14 Td
+(* Notification sound for new incoming messages.) Tj
+0 -14 Td
+(* Call notifications with ringtone when receiving calls.) Tj
+0 -14 Td
+(* Separate scrollable sidebar and chat area.) Tj
+0 -14 Td
+(* Responsive layout for mobile/tablet \(WhatsApp-style layout\).) Tj
+0 -14 Td
+() Tj
+0 -14 Td
+(MESSAGING FLOW) Tj
+0 -14 Td
+(* Messages stored in MongoDB via Mongoose.) Tj
+0 -14 Td
+(* Real-time delivery using Socket.io `sendMessage` / `receiveMessage`.) Tj
+0 -14 Td
+(* Message status tracking:) Tj
+0 -14 Td
+(* Sent \(single tick\)) Tj
+0 -14 Td
+(* Delivered \(double gray tick\)) Tj
+0 -14 Td
+(* Seen \(double blue tick\)) Tj
+0 -14 Td
+(* Delivered status is emitted when receiver gets message.) Tj
+0 -14 Td
+(* Seen status is emitted when receiver opens the chat and the app is focused.) Tj
+0 -14 Td
+() Tj
+0 -14 Td
+(AUDIO & VIDEO CALLING) Tj
+0 -14 Td
+(* 1-to-1 WebRTC calls with audio and video.) Tj
+0 -14 Td
+(* TURN support \(Twilio NTS\) for calls across different networks.) Tj
+0 -14 Td
+(* ICE candidate queuing until remote description is set.) Tj
+0 -14 Td
+(* Stream handling via `ontrack` and safe playback re-tries.) Tj
+0 -14 Td
+(* Call controls: start, accept, reject, hang up.) Tj
+0 -14 Td
+(* Auto-cleanup of tracks and peer connection on end.) Tj
+0 -14 Td
+() Tj
+0 -14 Td
+(UI / UX HIGHLIGHTS) Tj
+0 -14 Td
+(* WhatsApp-inspired layout and call button placement.) Tj
+0 -14 Td
+(* Separate scrollable chat list and message pane.) Tj
+0 -14 Td
+(* Link and long text wrapping in message bubbles.) Tj
+0 -14 Td
+(* Chat bubbles styled with sender context.) Tj
+0 -14 Td
+(* Last message preview under user name in sidebar.) Tj
+0 -14 Td
+(* "Scroll to latest" floating button when user scrolls up.) Tj
+0 -14 Td
+() Tj
+0 -14 Td
+(NOTIFICATIONS) Tj
+0 -14 Td
+ET
+endstream
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000241 00000 n 
+0000000311 00000 n 
+trailer
+<< /Size 6 /Root 1 0 R >>
+startxref
+2983
+%%EOF
