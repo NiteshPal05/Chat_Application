@@ -116,6 +116,24 @@ export default function ChatDashboard() {
     };
   }, []);
 
+  useEffect(() => {
+    // If tracks arrive before the call modal mounts, ensure refs still get the stream.
+    if (!(incomingCall || callActive || isCalling)) return;
+    const stream = remoteStreamRef.current;
+
+    if (remoteVideoRef.current) {
+      remoteVideoRef.current.srcObject = stream;
+      remoteVideoRef.current.muted = true;
+      remoteVideoRef.current.play?.().catch(() => {});
+    }
+
+    if (remoteAudioRef.current) {
+      remoteAudioRef.current.srcObject = stream;
+      remoteAudioRef.current.muted = false;
+      remoteAudioRef.current.play?.().catch(() => {});
+    }
+  }, [incomingCall, callActive, isCalling]);
+
 
 
   const getChatId = (email1, email2) => {
@@ -504,6 +522,33 @@ export default function ChatDashboard() {
     return pc;
   };
 
+  const attachLocalTracks = async (pc, stream, type) => {
+    const audioTrack = stream.getAudioTracks?.()[0] || null;
+    const videoTrack = type === "video" ? (stream.getVideoTracks?.()[0] || null) : null;
+
+    const transceivers = pc.getTransceivers?.() || [];
+    const audioTransceiver = transceivers.find((t) => t.receiver?.track?.kind === "audio");
+    const videoTransceiver = transceivers.find((t) => t.receiver?.track?.kind === "video");
+
+    if (audioTrack) {
+      if (audioTransceiver?.sender?.replaceTrack) {
+        audioTransceiver.direction = "sendrecv";
+        await audioTransceiver.sender.replaceTrack(audioTrack);
+      } else {
+        pc.addTrack(audioTrack, stream);
+      }
+    }
+
+    if (videoTrack) {
+      if (videoTransceiver?.sender?.replaceTrack) {
+        videoTransceiver.direction = "sendrecv";
+        await videoTransceiver.sender.replaceTrack(videoTrack);
+      } else {
+        pc.addTrack(videoTrack, stream);
+      }
+    }
+  };
+
   const flushPendingCandidates = async () => {
     if (!pcRef.current || !pcRef.current.remoteDescription) return;
     const pending = [...pendingCandidatesRef.current];
@@ -557,7 +602,7 @@ export default function ChatDashboard() {
         }
       }
       const pc = await createPeerConnection(type);
-      stream.getTracks().forEach((track) => pc.addTrack(track, stream));
+      await attachLocalTracks(pc, stream, type);
 
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
@@ -605,9 +650,8 @@ export default function ChatDashboard() {
       }
     }
     const pc = await createPeerConnection(type);
-    stream.getTracks().forEach((track) => pc.addTrack(track, stream));
-
     await pc.setRemoteDescription(incomingCall.offer);
+    await attachLocalTracks(pc, stream, type);
     await flushPendingCandidates();
     const answer = await pc.createAnswer();
     await pc.setLocalDescription(answer);
