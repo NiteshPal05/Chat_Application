@@ -364,16 +364,30 @@ export default function ChatDashboard() {
     return () => cleanupCall();
   }, []);
 
-  const createPeerConnection = (type) => {
+  const getIceServers = async () => {
+    try {
+      const res = await fetch(`${BASE_URL}/api/turn`);
+      const data = await res.json();
+      const list = data?.iceServers || [];
+      if (list.length > 0) {
+        return list.map((s) => ({
+          urls: s.urls || s.url,
+          username: s.username,
+          credential: s.credential,
+        }));
+      }
+    } catch {
+      // ignore and fall back to STUN
+    }
+    return [{ urls: "stun:stun.l.google.com:19302" }];
+  };
+
+  const createPeerConnection = async (type) => {
     if (pcRef.current) {
       pcRef.current.close();
       pcRef.current = null;
     }
-    const normalizedIceServers = (iceServers || []).map((s) => ({
-      urls: s.urls || s.url,
-      username: s.username,
-      credential: s.credential,
-    }));
+    const normalizedIceServers = await getIceServers();
     console.log("[WebRTC] Using iceServers:", normalizedIceServers);
     const pc = new RTCPeerConnection({
       iceServers: normalizedIceServers,
@@ -463,7 +477,7 @@ export default function ChatDashboard() {
           throw new Error("Video permission denied");
         }
       }
-      const pc = createPeerConnection(type);
+      const pc = await createPeerConnection(type);
       stream.getTracks().forEach((track) => pc.addTrack(track, stream));
 
       const offer = await pc.createOffer();
@@ -506,7 +520,7 @@ export default function ChatDashboard() {
         return;
       }
     }
-    const pc = createPeerConnection(type);
+    const pc = await createPeerConnection(type);
     stream.getTracks().forEach((track) => pc.addTrack(track, stream));
 
     await pc.setRemoteDescription(incomingCall.offer);
