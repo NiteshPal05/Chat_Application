@@ -431,6 +431,14 @@ export default function ChatDashboard() {
       console.log("[WebRTC] signalingState:", pc.signalingState);
     };
 
+    pc.onicegatheringstatechange = () => {
+      console.log("[WebRTC] iceGatheringState:", pc.iceGatheringState);
+    };
+
+    pc.onicecandidateerror = (event) => {
+      console.log("[WebRTC] iceCandidateError:", event.errorText || event);
+    };
+
     pc.ontrack = (event) => {
       console.log("[WebRTC] ontrack streams:", event.streams);
       const stream = event.streams[0] || new MediaStream([event.track]);
