@@ -37,6 +37,7 @@ export default function ChatDashboard() {
 
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
+  const remoteAudioRef = useRef(null);
   const pcRef = useRef(null);
   const pendingCandidatesRef = useRef([]);
   const localStreamRef = useRef(null);
@@ -401,6 +402,10 @@ export default function ChatDashboard() {
       pcRef.current.close();
       pcRef.current = null;
     }
+    // Reset remote stream per call to avoid ended tracks sticking around.
+    remoteStreamRef.current = new MediaStream();
+    if (remoteVideoRef.current) remoteVideoRef.current.srcObject = null;
+    if (remoteAudioRef.current) remoteAudioRef.current.srcObject = null;
     const normalizedIceServers = await getIceServers();
     console.log("[WebRTC] Using iceServers:", normalizedIceServers);
     const pc = new RTCPeerConnection({
@@ -452,26 +457,32 @@ export default function ChatDashboard() {
         readyState: event.track.readyState,
         enabled: event.track.enabled,
       });
-      event.track.onmute = () => {
-        console.log("[WebRTC] track muted:", event.track.kind);
-      };
-      event.track.onunmute = () => {
-        console.log("[WebRTC] track unmuted:", event.track.kind);
-      };
       const stream = remoteStreamRef.current;
+      // Keep at most one track of each kind in the remote stream.
+      if (event.track.kind === "video") {
+        stream.getVideoTracks().forEach((t) => stream.removeTrack(t));
+      }
+      if (event.track.kind === "audio") {
+        stream.getAudioTracks().forEach((t) => stream.removeTrack(t));
+      }
       const exists = stream.getTracks().some((t) => t.id === event.track.id);
       if (!exists) {
         stream.addTrack(event.track);
       }
       if (remoteVideoRef.current) {
         remoteVideoRef.current.srcObject = stream;
-        remoteVideoRef.current.muted = false;
-        event.track.onunmute = () => {
-          remoteVideoRef.current.play?.().catch(() => {});
-        };
-        setTimeout(() => {
-          remoteVideoRef.current?.play?.().catch(() => {});
-        }, 200);
+        // Keep video muted so autoplay isn't blocked; play audio via <audio>.
+        remoteVideoRef.current.muted = true;
+        remoteVideoRef.current.play?.().catch((err) => {
+          console.log("[WebRTC] remoteVideo play blocked:", err?.name || err);
+        });
+      }
+      if (remoteAudioRef.current) {
+        remoteAudioRef.current.srcObject = stream;
+        remoteAudioRef.current.muted = false;
+        remoteAudioRef.current.play?.().catch((err) => {
+          console.log("[WebRTC] remoteAudio play blocked:", err?.name || err);
+        });
       }
     };
 
@@ -642,6 +653,8 @@ export default function ChatDashboard() {
 
     if (localVideoRef.current) localVideoRef.current.srcObject = null;
     if (remoteVideoRef.current) remoteVideoRef.current.srcObject = null;
+    if (remoteAudioRef.current) remoteAudioRef.current.srcObject = null;
+    remoteStreamRef.current = new MediaStream();
     stopRingtone();
   };
 
@@ -1181,6 +1194,8 @@ export default function ChatDashboard() {
       {(incomingCall || callActive || isCalling) && (
         <div className="fixed inset-0 bg-black bg-opacity-60 flex justify-center items-center z-50">
           <div className="bg-white rounded-2xl p-4 w-[90%] max-w-3xl border border-white/60">
+            {/* Remote audio output */}
+            <audio ref={remoteAudioRef} autoPlay className="hidden" />
             {incomingCall && (
               <div className="mb-4 flex items-center justify-between">
                 <p className="font-semibold text-gray-800">
