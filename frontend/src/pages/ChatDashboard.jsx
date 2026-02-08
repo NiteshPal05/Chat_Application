@@ -627,15 +627,12 @@ export default function ChatDashboard() {
   }, []);
 
   useEffect(() => {
-    const shouldRing =
-      incomingCall && incomingCall.chatId === chatIdRef.current;
-
-    if (shouldRing) {
+    if (incomingCall) {
       playRingtone();
     } else {
       stopRingtone();
     }
-  }, [incomingCall, chatId]);
+  }, [incomingCall]);
 
   const scrollToBottom = () => {
     if (!messagesRef.current) return;
