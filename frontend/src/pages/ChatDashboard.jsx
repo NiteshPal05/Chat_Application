@@ -31,6 +31,9 @@ export default function ChatDashboard() {
   const [unreadCounts, setUnreadCounts] = useState({});
   const [isWindowFocused, setIsWindowFocused] = useState(true);
   const [socketConnected, setSocketConnected] = useState(false);
+  const [iceServers, setIceServers] = useState([
+    { urls: "stun:stun.l.google.com:19302" },
+  ]);
 
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
@@ -56,6 +59,22 @@ export default function ChatDashboard() {
       });
     }
     return () => {};
+  }, [BASE_URL]);
+
+  useEffect(() => {
+    const fetchIceServers = async () => {
+      if (!BASE_URL) return;
+      try {
+        const res = await fetch(`${BASE_URL}/api/turn`);
+        const data = await res.json();
+        if (data?.iceServers?.length) {
+          setIceServers(data.iceServers);
+        }
+      } catch {
+        // fallback to default STUN
+      }
+    };
+    fetchIceServers();
   }, [BASE_URL]);
 
   useEffect(() => {
@@ -347,9 +366,7 @@ export default function ChatDashboard() {
 
   const createPeerConnection = () => {
     const pc = new RTCPeerConnection({
-      iceServers: [
-        { urls: "stun:stun.l.google.com:19302" },
-      ],
+      iceServers,
     });
 
     pc.oniceconnectionstatechange = () => {

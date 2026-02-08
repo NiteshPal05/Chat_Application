@@ -3,6 +3,7 @@ import dotenv from "dotenv";
 import cors from "cors";
 import http from "http";
 import { Server } from "socket.io";
+import twilio from "twilio";
 import connectDB from "./config/db.js";
 import userRoutes from "./routes/userRoutes.js";
 import messageRoutes from "./routes/messageRoutes.js";
@@ -35,6 +36,23 @@ connectDB();
 
 app.use("/api/users", userRoutes);
 app.use("/api/messages", messageRoutes);
+
+// TURN credentials (Twilio Network Traversal Service)
+app.get("/api/turn", async (_req, res) => {
+  try {
+    if (!process.env.TWILIO_ACCOUNT_SID || !process.env.TWILIO_AUTH_TOKEN) {
+      return res.status(500).json({ error: "Twilio credentials missing" });
+    }
+    const client = twilio(
+      process.env.TWILIO_ACCOUNT_SID,
+      process.env.TWILIO_AUTH_TOKEN
+    );
+    const token = await client.tokens.create();
+    res.json({ iceServers: token.iceServers });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
 
 
 app.get("/", (_req, res) => {
