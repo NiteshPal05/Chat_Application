@@ -404,10 +404,10 @@ export default function ChatDashboard() {
     });
 
     if (type === "video") {
-      pc.addTransceiver("audio");
-      pc.addTransceiver("video");
+      pc.addTransceiver("audio", { direction: "sendrecv" });
+      pc.addTransceiver("video", { direction: "sendrecv" });
     } else if (type === "audio") {
-      pc.addTransceiver("audio");
+      pc.addTransceiver("audio", { direction: "sendrecv" });
     }
 
     pc.oniceconnectionstatechange = () => {
