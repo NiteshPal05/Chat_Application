@@ -380,7 +380,11 @@ export default function ChatDashboard() {
       const data = await res.json();
       const list = data?.iceServers || [];
       if (list.length > 0) {
-        return list.map((s) => ({
+        const tcpOnly = list.filter((s) =>
+          (s.urls || s.url || "").toString().includes("transport=tcp")
+        );
+        const useList = tcpOnly.length > 0 ? tcpOnly : list;
+        return useList.map((s) => ({
           urls: s.urls || s.url,
           username: s.username,
           credential: s.credential,
@@ -499,9 +503,20 @@ export default function ChatDashboard() {
   };
 
   const getLocalStream = async (type) => {
-    if (localStreamRef.current) return localStreamRef.current;
+    const existing = localStreamRef.current;
+    const needsVideo = type === "video";
+    const hasVideo = existing?.getVideoTracks?.().length > 0;
+
+    if (existing && (!needsVideo || hasVideo)) {
+      return existing;
+    }
+
+    if (existing) {
+      existing.getTracks().forEach((t) => t.stop());
+    }
+
     const stream = await navigator.mediaDevices.getUserMedia({
-      video: type === "video",
+      video: needsVideo,
       audio: true,
     });
     localStreamRef.current = stream;
