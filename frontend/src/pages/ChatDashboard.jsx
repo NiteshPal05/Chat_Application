@@ -441,12 +441,25 @@ export default function ChatDashboard() {
 
     pc.ontrack = (event) => {
       console.log("[WebRTC] ontrack streams:", event.streams);
-      const stream = event.streams[0] || new MediaStream([event.track]);
+      console.log("[WebRTC] track:", {
+        kind: event.track.kind,
+        muted: event.track.muted,
+        readyState: event.track.readyState,
+        enabled: event.track.enabled,
+      });
+      const stream = event.streams[0] || new MediaStream();
+      if (event.track.kind === "video" && stream.getVideoTracks().length === 0) {
+        stream.addTrack(event.track);
+      }
       if (remoteVideoRef.current) {
         remoteVideoRef.current.srcObject = stream;
+        remoteVideoRef.current.muted = false;
         event.track.onunmute = () => {
           remoteVideoRef.current.play?.().catch(() => {});
         };
+        setTimeout(() => {
+          remoteVideoRef.current?.play?.().catch(() => {});
+        }, 200);
       }
     };
 
