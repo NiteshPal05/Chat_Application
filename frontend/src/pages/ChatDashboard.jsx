@@ -46,6 +46,7 @@ export default function ChatDashboard() {
   const ringtoneRef = useRef(null);
   const activeCallChatIdRef = useRef(null);
   const activeCallIdRef = useRef(null);
+  const remoteStreamRef = useRef(new MediaStream());
   const usersRef = useRef([]);
   const currentEmailRef = useRef(null);
   const currentUsernameRef = useRef("");
