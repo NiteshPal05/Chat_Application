@@ -355,6 +355,10 @@ export default function ChatDashboard() {
     pc.ontrack = (event) => {
       if (remoteVideoRef.current) {
         remoteVideoRef.current.srcObject = event.streams[0];
+        const playPromise = remoteVideoRef.current.play?.();
+        if (playPromise?.catch) {
+          playPromise.catch(() => {});
+        }
       }
     };
 
