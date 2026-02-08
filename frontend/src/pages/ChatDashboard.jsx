@@ -45,6 +45,7 @@ export default function ChatDashboard() {
   const callRoleRef = useRef(null); // "caller" | "callee"
   const ringtoneRef = useRef(null);
   const activeCallChatIdRef = useRef(null);
+  const activeCallIdRef = useRef(null);
   const usersRef = useRef([]);
   const currentEmailRef = useRef(null);
   const currentUsernameRef = useRef("");
@@ -304,16 +305,19 @@ export default function ChatDashboard() {
     if (!socket) return;
 
     const handleOffer = (payload) => {
-      if (!payload?.chatId) return;
+      if (!payload?.chatId || !payload?.callId) return;
       if (callActive || isCalling || incomingCall || activeCallChatIdRef.current) {
-        socketRef.current?.emit("callReject", { chatId: payload.chatId, reason: "busy" });
+        socket.emit("callReject", { chatId: payload.chatId, callId: payload.callId, reason: "busy" });
         return;
       }
+      activeCallChatIdRef.current = payload.chatId;
+      activeCallIdRef.current = payload.callId;
       setIncomingCall(payload);
     };
 
     const handleAnswer = async (payload) => {
       if (payload.chatId !== activeCallChatIdRef.current) return;
+      if (payload.callId !== activeCallIdRef.current) return;
       if (!pcRef.current) return;
       if (callRoleRef.current !== "caller") return;
       if (pcRef.current.signalingState !== "have-local-offer") return;
@@ -325,6 +329,7 @@ export default function ChatDashboard() {
 
     const handleCandidate = async (payload) => {
       if (payload.chatId !== activeCallChatIdRef.current) return;
+      if (payload.callId !== activeCallIdRef.current) return;
       const candidate = new RTCIceCandidate(payload.candidate);
       if (pcRef.current) {
         if (pcRef.current.remoteDescription) {
@@ -339,11 +344,13 @@ export default function ChatDashboard() {
 
     const handleReject = (payload) => {
       if (payload.chatId !== activeCallChatIdRef.current) return;
+      if (payload.callId !== activeCallIdRef.current) return;
       cleanupCall();
     };
 
     const handleEnd = (payload) => {
       if (payload.chatId !== activeCallChatIdRef.current) return;
+      if (payload.callId !== activeCallIdRef.current) return;
       cleanupCall();
     };
 
@@ -360,7 +367,7 @@ export default function ChatDashboard() {
       socket.off("callReject", handleReject);
       socket.off("callEnd", handleEnd);
     };
-  }, [chatId, BASE_URL]);
+  }, []);
 
   useEffect(() => {
     return () => cleanupCall();
@@ -439,9 +446,11 @@ export default function ChatDashboard() {
       if (!event.candidate) return;
       console.log("[WebRTC] ICE candidate:", event.candidate.candidate);
       const activeChatId = activeCallChatIdRef.current || chatId;
+      const activeCallId = activeCallIdRef.current;
       if (!activeChatId) return;
       socketRef.current?.emit("iceCandidate", {
         chatId: activeChatId,
+        callId: activeCallId,
         candidate: event.candidate,
       });
     };
@@ -480,6 +489,7 @@ export default function ChatDashboard() {
       setCallType(type);
       callRoleRef.current = "caller";
       activeCallChatIdRef.current = chatId;
+      activeCallIdRef.current = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
       const stream = await getLocalStream(type);
       if (type === "video") {
@@ -498,6 +508,7 @@ export default function ChatDashboard() {
         chatId,
         from: currentUsername,
         callType: type,
+        callId: activeCallIdRef.current,
         offer,
       });
     } catch {
@@ -514,6 +525,7 @@ export default function ChatDashboard() {
     setCallType(type);
     callRoleRef.current = "callee";
     activeCallChatIdRef.current = incomingCall.chatId;
+    activeCallIdRef.current = incomingCall.callId;
     if (incomingCall.chatId && currentEmailRef.current) {
       const parts = incomingCall.chatId.split("_");
       const otherEmail = parts.find((p) => p !== currentEmailRef.current);
@@ -541,18 +553,19 @@ export default function ChatDashboard() {
 
     socketRef.current?.emit("callAnswer", {
       chatId: incomingCall.chatId,
+      callId: incomingCall.callId,
       answer,
     });
   };
 
   const rejectCall = () => {
     if (!incomingCall) return;
-    socketRef.current?.emit("callReject", { chatId: incomingCall.chatId });
+    socketRef.current?.emit("callReject", { chatId: incomingCall.chatId, callId: incomingCall.callId });
     setIncomingCall(null);
   };
 
   const endCall = () => {
-    socketRef.current?.emit("callEnd", { chatId: activeCallChatIdRef.current });
+    socketRef.current?.emit("callEnd", { chatId: activeCallChatIdRef.current, callId: activeCallIdRef.current });
     cleanupCall();
   };
 
@@ -570,6 +583,7 @@ export default function ChatDashboard() {
     }
     callRoleRef.current = null;
     activeCallChatIdRef.current = null;
+    activeCallIdRef.current = null;
 
     if (localStreamRef.current) {
       localStreamRef.current.getTracks().forEach((t) => t.stop());
