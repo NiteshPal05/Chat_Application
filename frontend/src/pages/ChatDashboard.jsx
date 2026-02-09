@@ -1368,11 +1368,11 @@ export default function ChatDashboard() {
             )}
 
             {/* Input */}
-            <div className="p-4 border-t border-white/60 bg-white/70 backdrop-blur flex gap-2 sticky bottom-0 z-10">
+            <div className="p-4 border-t border-white/60 bg-white/70 backdrop-blur flex gap-2 sticky bottom-0 z-10 chat-input-bar">
               {/* Attachment Button */}
               <label
                 htmlFor="fileUpload"
-                className="cursor-pointer bg-gray-200 px-4 py-2 rounded-xl"
+                className="cursor-pointer bg-gray-200 px-4 py-2 rounded-xl chat-attach-btn"
               >
                 📎
               </label>
@@ -1408,7 +1408,7 @@ export default function ChatDashboard() {
                 type="text"
                 value={message}
                 placeholder="Type a message..."
-                className="flex-1 border rounded-xl px-4 py-2 bg-white"
+                className="flex-1 border rounded-xl px-4 py-2 bg-white chat-message-input"
                 onChange={(e) => setMessage(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && !e.shiftKey) {
@@ -1421,7 +1421,7 @@ export default function ChatDashboard() {
               <button
                 onClick={sendMessage}
                 disabled={sending}
-                className={`px-6 rounded-xl text-white ${sending
+                className={`px-6 rounded-xl text-white chat-send-btn ${sending
                   ? "bg-gray-400 cursor-not-allowed"
                   : "bg-green-600 hover:bg-green-700"
                   }`}

@@ -134,3 +134,26 @@
     padding-right: 4px;
   }
 }
+
+
+/* Mobile input bar tweaks */
+@media (max-width: 640px) {
+  .chat-input-bar {
+    padding: 10px 12px;
+    gap: 8px;
+  }
+
+  .chat-attach-btn {
+    padding: 8px 12px;
+  }
+
+  .chat-message-input {
+    padding: 8px 12px;
+    font-size: 14px;
+  }
+
+  .chat-send-btn {
+    padding: 8px 12px;
+    font-size: 14px;
+  }
+}
