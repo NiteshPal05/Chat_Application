@@ -1,7 +1,7 @@
 # Chat Application
 
 A real-time 1-to-1 chat app with WhatsApp-style UI, audio/video calling, and message delivery/seen status.
-Lve -> chat-application-one-gules.vercel.app
+Lve -> https://chat-application-one-gules.vercel.app
 
 ## Features
 - 1-to-1 messaging with media (images/documents)
