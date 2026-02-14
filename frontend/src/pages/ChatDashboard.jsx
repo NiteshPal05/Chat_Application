@@ -1368,11 +1368,11 @@ export default function ChatDashboard() {
             )}
 
             {/* Input */}
-            <div className="p-4 border-t border-white/60 bg-white/70 backdrop-blur flex gap-2 sticky bottom-0 z-10 chat-input-bar">
+            <div className="p-4 border-t border-white/60 bg-white/70 backdrop-blur flex flex-wrap items-center gap-2 sticky bottom-0 z-10 chat-input-bar">
               {/* Attachment Button */}
               <label
                 htmlFor="fileUpload"
-                className="cursor-pointer bg-gray-200 px-4 py-2 rounded-xl chat-attach-btn"
+                className="cursor-pointer bg-gray-200 px-4 py-2 rounded-xl chat-attach-btn shrink-0 order-2"
               >
                 📎
               </label>
@@ -1388,14 +1388,15 @@ export default function ChatDashboard() {
               />
 
               {selectedFileName && (
-                <div className="text-sm text-gray-600 flex items-center gap-2">
-                  📎 {selectedFileName}
+                <div className="order-1 basis-full text-sm text-gray-600 flex items-center gap-2 min-w-0 bg-gray-100 rounded-lg px-2 py-1">
+                  <span className="shrink-0">📎</span>
+                  <span className="truncate">{selectedFileName}</span>
                   <button
                     onClick={() => {
                       setFile(null);
                       setSelectedFileName("");
                     }}
-                    className="text-red-500 font-bold"
+                    className="text-red-500 font-bold shrink-0"
                   >
                     ✕
                   </button>
@@ -1408,7 +1409,7 @@ export default function ChatDashboard() {
                 type="text"
                 value={message}
                 placeholder="Type a message..."
-                className="flex-1 border rounded-xl px-4 py-2 bg-white chat-message-input"
+                className="flex-1 min-w-0 border rounded-xl px-4 py-2 bg-white chat-message-input order-3"
                 onChange={(e) => setMessage(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && !e.shiftKey) {
@@ -1421,7 +1422,7 @@ export default function ChatDashboard() {
               <button
                 onClick={sendMessage}
                 disabled={sending}
-                className={`px-6 rounded-xl text-white chat-send-btn ${sending
+                className={`px-6 rounded-xl text-white chat-send-btn shrink-0 min-w-[72px] order-4 ${sending
                   ? "bg-gray-400 cursor-not-allowed"
                   : "bg-green-600 hover:bg-green-700"
                   }`}
