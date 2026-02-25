@@ -39,9 +39,9 @@ Create a `.env` file in `backend/`:
 
 ```env
 PORT=5001
-MONGO_URI=your_mongodb_uri
-TWILIO_ACCOUNT_SID=your_twilio_sid
-TWILIO_AUTH_TOKEN=your_twilio_auth_token
+MONGO_URI=my_mongodb_uri
+TWILIO_ACCOUNT_SID=my_twilio_sid
+TWILIO_AUTH_TOKEN=my_twilio_auth_token
 ```
 
 ### 3. Frontend setup
